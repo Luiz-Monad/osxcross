@@ -1,0 +1,130 @@
+name: Build MacOS cross-toolchain compiler
+
+on:
+  workflow_call:
+    inputs:
+
+      runner:
+        description: 'Job runner'
+        required: true
+        type: string
+
+      branch:
+        description: 'Branch to build'
+        required: true
+        type: string
+
+      build_clang:
+        description: 'Build clang from source'
+        required: true
+        type: boolean
+
+      use_ld64:
+        description: 'Install LD64 from distro'
+        required: true
+        type: boolean
+
+    secrets:
+
+      NGROK_TOKEN:
+        required: true
+
+      NGROK_SSH_PUBKEY:
+        required: true
+
+env:
+  DOCKER_BUILDKIT: 1
+  RUNNER: ${{ inputs.runner }}
+jobs:
+
+  build_compiler:
+    name: Build MacOS cross-toolchain compiler
+    runs-on: ${{ inputs.runner }}
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-config: .github/buildkit.toml
+
+      - name: Login to Docker
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Image Name
+        id: imagename
+        run: |
+          IMG="${GITHUB_REPOSITORY,,}/compiler-${{ inputs.branch }}"
+          echo "name=ghcr.io/${IMG/ /-}" >> $GITHUB_OUTPUT
+          echo "rawname=${IMG/ /-}" >> $GITHUB_OUTPUT
+          echo "gh_repo=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+
+      - name: Stop Commands
+        run: T="$(echo -n ${{ github.token }} | sha256sum | head -c 64)" && echo -e "::add-mask::${T}\n::stop-commands::${T}"
+
+      - name: Build container
+        uses: docker/build-push-action@v6
+        with:
+          context: container
+          pull: true
+          push: true
+          provenance: false
+          tags: ${{ steps.imagename.outputs.name }}:latest
+          cache-from: type=registry,ref=${{ steps.imagename.outputs.name }}:cache
+          cache-to: type=registry,mode=max,ref=${{ steps.imagename.outputs.name }}:cache
+          build-args: |
+            OSX_CROSS_BRANCH=${{ inputs.branch }}
+            BUILD_CLANG=${{ inputs.build_clang }}
+            USE_LD64=${{ inputs.use_ld64 }}
+          secrets: |
+            "NGROK_TOKEN=${{ secrets.NGROK_TOKEN }}"
+            "NGROK_SSH_PUBKEY=${{ secrets.NGROK_SSH_PUBKEY }}"
+
+      - name: Cleanup
+        continue-on-error: true
+        uses: BtbN/delete-untagged-ghcr-action@main
+        with:
+          token: ${{ github.token }}
+          package_name: ${{ steps.imagename.outputs.rawname }}
+          repository_owner: ${{ github.repository_owner }}
+          repository: ${{ github.repository }}
+          owner_type: user
+          untagged_only: true
+
+  publish_release:
+    name: Publish release
+    if: ${{ !cancelled() && needs.build_compiler.result == 'success' }}
+    needs: build_compiler
+    runs-on: ${{ inputs.runner }}
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ffmpeg-*
+          merge-multiple: true
+          path: artifacts
+
+      - name: Create release
+        id: create_release
+        run: |
+          set -xe
+          shopt -s nullglob
+          RELDATE="$(date +'%Y-%m-%d %H:%M')"
+          NAME="Auto-Build $RELDATE"
+          TAGNAME="autobuild-$(date +'%Y-%m-%d-%H-%M')"
+          gh release create "$TAGNAME" --target "master" --title "$NAME" container/*
+          echo "tag_name=${TAGNAME}" >> $GITHUB_OUTPUT
+          echo "rel_date=${RELDATE}" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

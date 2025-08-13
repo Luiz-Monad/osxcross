@@ -1,0 +1,43 @@
+name: Build MacOS cross-toolchain compiler
+
+on:
+  # schedule:
+  #   - cron: "0 12 * * *"
+
+  push:
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: "Run with debug"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  prepare:
+    name: Checkout
+    runs-on: linux
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+  build_runner_base:
+    name: Build on Runner
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          # - { branch: 1.0-apple-binutils, build_clang: false, use_ld64: false }
+          - { branch: 2.0-llvm-based, build_clang: false, use_ld64: true }
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      runner: linux
+      branch: ${{ matrix.compiler.branch }}
+      build_clang: ${{ matrix.compiler.build_clang }}
+      use_ld64: ${{ matrix.compiler.use_ld64 }}

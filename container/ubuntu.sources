@@ -1,0 +1,22 @@
+# Ubuntu main
+Types: deb
+URIs: http://archive.ubuntu.com/ubuntu/
+Suites: noble noble-updates noble-backports
+Components: main universe restricted multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+Architectures: amd64
+
+# Ubuntu security
+Types: deb
+URIs: http://security.ubuntu.com/ubuntu/
+Suites: noble-security
+Components: main universe restricted multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+Architectures: amd64
+
+# Ubuntu ports
+Types: deb
+URIs: http://ports.ubuntu.com/
+Suites: noble noble-security noble-backports noble-updates
+Components: main multiverse universe
+Architectures: arm64
