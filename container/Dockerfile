@@ -11,23 +11,12 @@ ARG USE_LD64=false
 # Install required packages
 COPY ./ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        llvm clang cmake make ninja-build pkg-config curl xz-utils \
+        llvm lld clang cmake make ninja-build pkg-config curl xz-utils \
         patch git file python3 python3-pip unzip bzip2 ca-certificates \
         libxml2-dev liblzma-dev libssl-dev zlib1g-dev uuid-dev \
         && \
     apt-get -y clean && \
     rm -rf /var/lib/apt/lists/*
-
-# Install required packages (arm64)
-RUN [ "$USE_LD64" = "true" ] && ( \
-    dpkg --add-architecture arm64 && \
-    apt-get update && apt-get install -y --no-install-recommends \          
-        lld-17 \
-        gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6:arm64 libstdc++6:arm64 \
-        && \
-    apt-get -y clean && \
-    rm -rf /var/lib/apt/lists/* \
-    ) || true
 
 FROM base AS tarball
 
@@ -48,6 +37,9 @@ RUN cat ${OSX_SDK_BASENAME}.part* > ${OSX_SDK_BASENAME} && \
 
 FROM tarball AS compiler
 
+# Fix LLD
+RUN ln -s $(ls -1 /usr/bin/ld64.lld-* | sort -V | tail -1) /usr/bin/ld64.lld
+
 # Build clang itslf
 WORKDIR /build/osxcross
 RUN [ "$BUILD_CLANG" = "true" ] && \
@@ -57,10 +49,10 @@ RUN [ "$BUILD_CLANG" = "true" ] && \
 WORKDIR /build/osxcross
 RUN TARGET_DIR=/opt/osxcross UNATTENDED=1 ./build.sh || true
 
-COPY ./debug.sh ./debug.sh
-RUN --mount=type=secret,id=NGROK_SSH_PUBKEY,env=NGROK_SSH_PUBKEY \
-    --mount=type=secret,id=NGROK_TOKEN,env=NGROK_TOKEN \
-    bash -c ./debug.sh && tail -f /dev/null
+# COPY ./debug.sh ./debug.sh
+# RUN --mount=type=secret,id=NGROK_SSH_PUBKEY,env=NGROK_SSH_PUBKEY \
+#     --mount=type=secret,id=NGROK_TOKEN,env=NGROK_TOKEN \
+#     bash -c ./debug.sh && tail -f /dev/null
 
 # Clean
 WORKDIR /opt/osxcross

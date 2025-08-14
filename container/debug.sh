@@ -15,7 +15,7 @@ chown $USER_NAME:$USER_NAME $USER_DIR/.ssh -R
 # Install SSHD
 echo "Installing sshd..."
 apt-get update
-apt-get install -y openssh-server
+apt-get install -y --no-install-recommends openssh-server wget
 service ssh start
 
 # SSHD status

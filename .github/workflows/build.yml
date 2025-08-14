@@ -19,11 +19,6 @@ on:
         required: true
         type: boolean
 
-      use_ld64:
-        description: 'Install LD64 from distro'
-        required: true
-        type: boolean
-
     secrets:
 
       NGROK_TOKEN:
@@ -82,7 +77,6 @@ jobs:
           build-args: |
             OSX_CROSS_BRANCH=${{ inputs.branch }}
             BUILD_CLANG=${{ inputs.build_clang }}
-            USE_LD64=${{ inputs.use_ld64 }}
           secrets: |
             "NGROK_TOKEN=${{ secrets.NGROK_TOKEN }}"
             "NGROK_SSH_PUBKEY=${{ secrets.NGROK_SSH_PUBKEY }}"
